@@ -30,6 +30,8 @@
             <TextBlock Margin="2">저장 경로</TextBlock>
             <TextBox Margin="2" Name="workingDirectoryTextBox"></TextBox>
             <Button Margin="2" Click="ChangeSaveDirectoryButton_Click">선택</Button>
+            <TextBlock Margin="2">푸치 프로필 폴더 이름 (미지정시 스킵)</TextBlock>
+            <TextBox Margin="2" Name="puchiProfileTextBox"></TextBox>
             <TextBlock Margin="2" TextWrapping="Wrap">백업할 아이돌 (저장명 칸 더블클릭하여 수정)</TextBlock>
         </StackPanel>
         <DataGrid Margin="4 0" Name="idolListGrid" Grid.Row="1" Grid.Column="1" AutoGenerateColumns="False">

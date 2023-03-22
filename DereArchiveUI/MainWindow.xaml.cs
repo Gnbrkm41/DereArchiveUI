@@ -122,19 +122,19 @@ namespace DereArchiveUI
             // The app will try to connect to the top page of deremas, which results in login flow initially.
             // After all the login flow is complete, the page will (hopefully) be at the initial URL which is https://sp.pf.mbga.jp/12008305/.
             // Here, we try and read the cookies so that we can do stuffs:tm:
-            if (webView.Source.AbsoluteUri == ("https://sp.pf.mbga.jp/12008305/"))
+            if (webView.Source.AbsoluteUri.StartsWith("https://sp.pf.mbga.jp/12008305"))
             {
                 var cookies = await webView.CoreWebView2.CookieManager.GetCookiesAsync("https://sp.pf.mbga.jp/12008305");
                 _token = cookies.FirstOrDefault(x => x.Name == "sp_mbga_sid_12008305")?.Value ?? "";
                 _pre = cookies.FirstOrDefault(x => x.Name == "PRE")?.Value ?? "";
-                if (_token != null && !_isNavigated)
-                {
-                    webView.Source = new Uri("https://sp.pf.mbga.jp/12008305/?guid=ON&url=http%3A%2F%2Fmobamas.net%2Fidolmaster%2Fidol_gallery%2Findex%2F0%2F0%2F1%2F0");
-                    _isNavigated = true;
+
+                if (webView.Source.AbsoluteUri == ("https://sp.pf.mbga.jp/12008305/")) {
+                    if (_token != null && !_isNavigated) {
+                        webView.Source = new Uri("https://sp.pf.mbga.jp/12008305/?guid=ON&url=http%3A%2F%2Fmobamas.net%2Fidolmaster%2Fidol_gallery%2Findex%2F0%2F0%2F1%2F0");
+                        _isNavigated = true;
+                    }
                 }
-            }
-            else if (webView.Source.AbsoluteUri.StartsWith("https://sp.pf.mbga.jp/12008305"))
-            {
+
                 Uri originalUrl = webView.Source;
                 NameValueCollection queries = HttpUtility.ParseQueryString(originalUrl.Query);
                 if (queries["url"] == null)
@@ -145,14 +145,21 @@ namespace DereArchiveUI
                 var mobamasUrl = new Uri(queries["url"]!);
                 if (mobamasUrl.LocalPath.StartsWith("/idolmaster/idol_gallery/idol_detail/"))
                 {
-                    var idolNameDiv = await _devToolsContext.QuerySelectorAsync<HtmlDivElement>(".detail_idol_real_name");
-                    string name = await idolNameDiv.GetTextContentAsync();
-                    if (!_idolInfos.Any(x => x.Name == name))
+                    try
                     {
-                        _idolInfos.Add(new(name, webView.Source.AbsoluteUri));
+                        var idolNameDiv = await _devToolsContext.QuerySelectorAsync<HtmlDivElement>(".detail_idol_real_name");
+                        string name = await idolNameDiv.GetTextContentAsync();
+                        if (!_idolInfos.Any(x => x.Name == name)) {
+                            _idolInfos.Add(new(name, webView.Source.AbsoluteUri));
+                        }
+                    }
+                    catch (WebView2DevToolsEvaluationFailedException ex)
+                    {
+                        // User navigated while the above selector was evaluating; ignore
                     }
                 }
             }
+
         }
 
         private void webView_CoreWebView2InitializationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2InitializationCompletedEventArgs e)
@@ -164,7 +171,8 @@ namespace DereArchiveUI
             [property: JsonPropertyName("token")] string Token,
             [property: JsonPropertyName("pre")] string Pre,
             [property: JsonPropertyName("idols")] Idol[] Idols,
-            [property: JsonPropertyName("commus")] Commu[] Commus);
+            [property: JsonPropertyName("commus")] Commu[] Commus,
+            [property: JsonPropertyName("puchiProfileName")] string PuchiProfileName);
 
         private void ChangeProgramPathButton_Click(object sender, RoutedEventArgs e)
         {
@@ -215,6 +223,7 @@ namespace DereArchiveUI
             var pre = _pre;
             var token = _token;
             var workingPath = workingDirectoryTextBox.Text;
+            var puchiProfileFolderName = puchiProfileTextBox.Text;
             bool isValidPath = false;
             try
             {
@@ -248,6 +257,11 @@ namespace DereArchiveUI
                 return;
             }
 
+            if (invalidChars.Any(ch => puchiProfileFolderName.Contains(ch))) {
+                MessageBox.Show("푸치 프로필 폴더명에 폴더 이름으로 허용되지 않는 문자가 있습니다. 확인 후 재시도해주세요");
+                return;
+            }
+
             string programPath = programPathTextBox.Text;
             if (string.IsNullOrWhiteSpace(programPath))
             {
@@ -256,7 +270,7 @@ namespace DereArchiveUI
             }
             string programDirectory = string.Join(Path.DirectorySeparatorChar, programPath.Split(Path.DirectorySeparatorChar)[..^1]);
             string savePath = Path.Join(programDirectory, "configuration.json");
-            string serialized = JsonSerializer.Serialize(new Configuration(workingPath, token, pre ?? "", idols, commus), new JsonSerializerOptions() { WriteIndented = true });
+            string serialized = JsonSerializer.Serialize(new Configuration(workingPath, token, pre ?? "", idols, commus, puchiProfileFolderName), new JsonSerializerOptions() { WriteIndented = true });
             File.WriteAllText(savePath, serialized);
 
             var result = MessageBox.Show("저장 완료! 프로그램을 실행할까요?", "완료", MessageBoxButton.YesNo);
